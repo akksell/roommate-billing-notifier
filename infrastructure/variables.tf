@@ -7,6 +7,11 @@ variable "google_project_region" {
   default = "us-central1"
 }
 
+variable "environment" {
+  type = string
+}
+
+/*
 variable "firestore_location_id" {
   type        = string
   description = "Firestore location (e.g. nam5, us-central1)"
@@ -33,3 +38,4 @@ variable "gmail_inbox_user" {
   type        = string
   description = "Gmail inbox user (e.g. billing@example.com). Required; set in tfvars, do not commit."
 }
+*/

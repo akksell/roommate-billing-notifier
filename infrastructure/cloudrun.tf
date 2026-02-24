@@ -1,3 +1,4 @@
+/*
 resource "google_cloud_run_v2_service" "rbn" {
   name     = "rbn"
   location = var.google_project_region
@@ -40,7 +41,7 @@ resource "google_cloud_run_v2_service" "rbn" {
     }
     scaling {
       min_instance_count = 0
-      max_instance_count = 10
+      max_instance_count = 1
     }
   }
 
@@ -66,3 +67,4 @@ resource "google_cloud_run_v2_service_iam_policy" "rbn" {
   location    = google_cloud_run_v2_service.rbn.location
   policy_data = data.google_iam_policy.run_invoker.policy_data
 }
+*/

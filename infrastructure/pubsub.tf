@@ -1,3 +1,4 @@
+/*
 resource "google_pubsub_topic" "gmail" {
   name = var.gmail_topic_name
 }
@@ -16,3 +17,4 @@ resource "google_pubsub_subscription" "gmail_push" {
     push_endpoint = "${var.cloud_run_url}/push"
   }
 }
+*/
