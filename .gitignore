@@ -6,6 +6,11 @@ devenv.local.yaml
 # direnv
 .direnv
 
+# terraform
+**/.terraform
+**/*.tfstate
+**/*.tfstate.backup
+
 # pre-commit
 .pre-commit-config.yaml
 
