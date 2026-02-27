@@ -1,6 +1,11 @@
 name: Setup devenv
 description: Install Nix and devenv so commands can be run via `devenv shell`.
 
+inputs:
+  github_token:
+    description: "Token to use to pull nix packages without hitting github rate limits"
+    required: true
+
 runs:
   using: composite
   steps:
@@ -8,7 +13,7 @@ runs:
       uses: cachix/install-nix-action@v31.9.1
       with:
         extra_nix_config: |
-          experimental-features = nix-command flakes
+          access-tokens = github.com=${{ inputs.github_token }}
 
     - name: Install devenv
       run: nix profile install github:cachix/devenv/latest

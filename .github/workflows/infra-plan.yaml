@@ -19,10 +19,12 @@ jobs:
     environment: dev
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup devenv
         uses: ./.github/actions/setup-devenv
+        with:
+          github_token: ${{ github.token }}
 
       - name: Authenticate to GCP via Workload Identity Federation
         uses: ./.github/actions/auth-gcp-wif

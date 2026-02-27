@@ -22,6 +22,8 @@ jobs:
 
       - name: Setup devenv
         uses: ./.github/actions/setup-devenv
+        with:
+          github_token: ${{ github.token }}
 
       - name: Authenticate to GCP via Workload Identity Federation
         uses: ./.github/actions/authenticate-gcp
