@@ -85,7 +85,7 @@ jobs:
               header,
               '',
               '<details>',
-              '\t<summary>Click here to view the terraform plan</summary>'
+              '\t<summary>Click here to view the terraform plan</summary>',
               '```',
               ...lines,
               '```',
