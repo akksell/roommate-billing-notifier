@@ -25,9 +25,10 @@ jobs:
         uses: ./.github/actions/setup-devenv
         with:
           github_token: ${{ github.token }}
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: Authenticate to GCP via Workload Identity Federation
-        uses: ./.github/actions/auth-gcp-wif
+        uses: ./.github/actions/authenticate-gcp
         with:
           workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
           service_account: ${{ vars.GCP_INFRA_MGR_SA }}

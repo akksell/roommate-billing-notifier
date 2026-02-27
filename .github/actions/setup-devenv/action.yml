@@ -5,6 +5,8 @@ inputs:
   github_token:
     description: "Token to use to pull nix packages without hitting github rate limits"
     required: true
+  cachix_auth_token:
+    description: "Cachix token to speed up devenv builds"
 
 runs:
   using: composite
@@ -14,6 +16,12 @@ runs:
       with:
         extra_nix_config: |
           access-tokens = github.com=${{ inputs.github_token }}
+
+    - name: Pull from cachix cache
+      uses: cachix/cachix-action@v15
+      with:
+        name: akksell
+        authToken: "${{ inputs.cachix_auth_token }}"
 
     - name: Install devenv
       run: nix profile install github:cachix/devenv/latest
