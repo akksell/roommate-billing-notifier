@@ -1,0 +1,20 @@
+name: Setup devenv
+description: Install Nix and devenv so commands can be run via `devenv shell`.
+
+runs:
+  using: composite
+  steps:
+    - name: Install Nix
+      uses: cachix/install-nix-action@v31.9.1
+      with:
+        extra_nix_config: |
+          experimental-features = nix-command flakes
+
+    - name: Install devenv
+      run: nix profile install github:cachix/devenv/latest
+      shell: bash
+
+    - name: Show devenv version
+      run: devenv --version && echo "devenv installed"
+      shell: bash
+    

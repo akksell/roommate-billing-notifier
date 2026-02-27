@@ -1,0 +1,107 @@
+name: Terraform Plan (infra)
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '**/*.tf'
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+jobs:
+  terraform-plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup devenv
+        uses: ./.github/actions/setup-devenv
+
+      - name: Authenticate to GCP via Workload Identity Federation
+        uses: ./.github/actions/auth-gcp-wif
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_INFRA_MGR_SA }}
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Terraform init
+        shell: devenv shell
+        run: terraform -chdir=infrastructure init -backend-config=config/backend.dev.config
+
+      - name: Terraform plan
+        run: devenv shell -c "terraform -chdir=infrastructure plan -var-file=env/dev.tfvars -out=tfplan"
+
+      - name: Generate plan text output
+        run: devenv shell -c "terraform -chdir=infrastructure show -no-color tfplan" > tfplan.txt
+
+      - name: Generate plan JSON output
+        run: devenv shell -c "terraform -chdir=infrastructure show -json tfplan" > tfplan.json
+
+      - name: Check for destroy actions
+        id: check_destroy
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const core = require('@actions/core');
+
+            const planJson = JSON.parse(fs.readFileSync('tfplan.json', 'utf8'));
+            const resourceChanges = planJson.resource_changes || [];
+
+            const destroys = resourceChanges.filter(rc => {
+              const actions = (rc.change && rc.change.actions) || [];
+              return actions.includes('delete');
+            });
+
+            const hasDestroy = destroys.length > 0;
+            core.info(`Found ${destroys.length} resource changes with delete actions.`);
+            core.setOutput('has_destroy', hasDestroy ? 'true' : 'false');
+
+      - name: Comment plan on PR
+        if: always()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const planText = fs.readFileSync('tfplan.txt', 'utf8');
+            const hasDestroy = '${{ steps.check_destroy.outputs.has_destroy }}' === 'true';
+
+            const lines = planText.split('\n');
+
+            const header = hasDestroy
+              ? 'Terraform plan includes resource deletions (destroy actions). This PR cannot be merged.'
+              : 'Terraform plan does not include resource deletions. This PR may be merged.';
+
+            const body = [
+              '## Terraform Plan',
+              '',
+              header,
+              '',
+              '<details>',
+              '\t<summary>Click here to view the terraform plan</summary>'
+              '```',
+              ...lines,
+              '```',
+              </details>
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.name,
+              issue_number: context.issue.number,
+              body,
+            });
+
+      - name: Fail if destroy actions are present
+        if: steps.check_destroy.outputs.has_destroy == 'true'
+        run: |
+          echo "Terraform plan includes resource deletions (destroy actions). Failing check to block merge."
+          exit 1
+
