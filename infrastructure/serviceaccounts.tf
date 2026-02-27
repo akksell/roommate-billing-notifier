@@ -42,3 +42,15 @@ resource "google_project_iam_member" "gh_actions_storage_bucket_member" {
   role = "roles/storage.admin"
   member = "serviceAccount:${google_service_account.github_actions_infra_ci_account.email}"
 }
+
+resource "google_project_iam_member" "gh_actions_service_account_member" {
+  project = var.google_project_id
+  role = "roles/iam.serviceAccountAdmin"
+  member = "serviceAccount:${google_service_account.github_actions_infra_ci_account.email}"
+}
+
+resource "google_project_iam_member" "gh_actions_project_iam_member" {
+  project = var.google_project_id
+  role = "roles/resourcemanager.projectIamAdmin"
+  member = "serviceAccount:${google_service_account.github_actions_infra_ci_account.email}"
+}
