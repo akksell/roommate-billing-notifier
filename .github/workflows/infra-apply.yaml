@@ -1,0 +1,41 @@
+name: Terraform Apply (infra)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '**/*.tf'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  terraform-apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup devenv
+        uses: ./.github/actions/setup-devenv
+        with:
+          github_token: ${{ github.token }}
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Authenticate to GCP via Workload Identity Federation
+        uses: ./.github/actions/authenticate-gcp
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_INFRA_MGR_SA }}
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Terraform init
+        run: devenv shell -- terraform -chdir=infrastructure init -backend-config=config/backend.dev.config
+
+      - name: Terraform apply
+        run: devenv shell -- terraform -chdir=infrastructure apply -var-file=env/dev.tfvars -auto-approve
+
