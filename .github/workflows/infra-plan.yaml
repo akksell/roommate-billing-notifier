@@ -35,16 +35,16 @@ jobs:
           project_id: ${{ vars.GCP_PROJECT_ID }}
 
       - name: Terraform init
-        run: devenv shell -c "terraform -chdir=infrastructure init -backend-config=config/backend.dev.config"
+        run: devenv shell -- terraform -chdir=infrastructure init -backend-config=config/backend.dev.config
 
       - name: Terraform plan
-        run: devenv shell -c "terraform -chdir=infrastructure plan -var-file=env/dev.tfvars -out=tfplan"
+        run: devenv shell -- terraform -chdir=infrastructure plan -var-file=env/dev.tfvars -out=tfplan
 
       - name: Generate plan text output
-        run: devenv shell -c "terraform -chdir=infrastructure show -no-color tfplan" > tfplan.txt
+        run: devenv shell -- terraform -chdir=infrastructure show -no-color tfplan > tfplan.txt
 
       - name: Generate plan JSON output
-        run: devenv shell -c "terraform -chdir=infrastructure show -json tfplan" > tfplan.json
+        run: devenv shell -- terraform -chdir=infrastructure show -json tfplan > tfplan.json
 
       - name: Check for destroy actions
         id: check_destroy

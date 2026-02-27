@@ -34,8 +34,8 @@ jobs:
           project_id: ${{ vars.GCP_PROJECT_ID }}
 
       - name: Terraform init
-        run: devenv shell -c "terraform -chdir=infrastructure init -backend-config=config/backend.dev.config"
+        run: devenv shell -- terraform -chdir=infrastructure init -backend-config=config/backend.dev.config
 
       - name: Terraform apply
-        run: devenv shell -c "terraform -chdir=infrastructure apply -var-file=env/dev.tfvars -auto-approve"
+        run: devenv shell -- terraform -chdir=infrastructure apply -var-file=env/dev.tfvars -auto-approve
 
