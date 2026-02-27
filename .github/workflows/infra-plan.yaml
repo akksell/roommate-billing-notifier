@@ -89,7 +89,7 @@ jobs:
               '```',
               ...lines,
               '```',
-              </details>
+              '</details>'
             ].join('\n');
 
             await github.rest.issues.createComment({
