@@ -1,6 +1,5 @@
-/*
 resource "google_pubsub_topic" "gmail" {
-  name = var.gmail_topic_name
+  name = "incoming-email-${var.environment}"
 }
 
 # Allow Gmail to publish to the topic
@@ -10,6 +9,7 @@ resource "google_pubsub_topic_iam_member" "gmail_push" {
   member = "serviceAccount:gmail-api-push@system.gserviceaccount.com"
 }
 
+/*
 resource "google_pubsub_subscription" "gmail_push" {
   name   = "gmail-push"
   topic  = google_pubsub_topic.gmail.name
