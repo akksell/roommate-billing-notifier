@@ -14,6 +14,9 @@
     pkgs.terraform
     pkgs.google-cloud-sdk
   ];
+  
+  cachix.pull = [ "akksell" ];
+  cachix.push = "akksell";
 
   # https://devenv.sh/languages/
   # languages.rust.enable = true;
