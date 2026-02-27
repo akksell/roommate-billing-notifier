@@ -86,6 +86,7 @@ jobs:
               '',
               '<details>',
               '\t<summary>Click here to view the terraform plan</summary>',
+              '',
               '```',
               ...lines,
               '```',
