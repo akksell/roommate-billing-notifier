@@ -12,12 +12,6 @@ variable "environment" {
 }
 
 /*
-variable "firestore_location_id" {
-  type        = string
-  description = "Firestore location (e.g. nam5, us-central1)"
-  default     = "nam5"
-}
-
 variable "cloud_run_image" {
   type        = string
   description = "Container image URL for the RBN service (e.g. gcr.io/PROJECT/rbn)"
