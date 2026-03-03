@@ -85,22 +85,47 @@ Follow Google's Go style guide. Use interfaces sparingly — prefer concrete typ
 | `internal/pubsub` | Decodes base64 Pub/Sub push payload from Gmail watch |
 | `internal/notify` | Formats and sends bill notification emails |
 
-### Configuration (env vars)
+### Configuration
+
+**Environment variables**
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `GMAIL_INBOX_USER` | yes | — | Gmail address to read bills from and send notifications as |
-| `FIRESTORE_PROJECT_ID` | yes | — | GCP project for Firestore |
-| `CONFIG_PATH` | no | — | Path to optional YAML config file (for `filters`) |
+| `FIRESTORE_PROJECT_ID` | yes | — | GCP project for Firestore and Secret Manager |
+| `CONFIG_BUCKET` | yes | — | GCS bucket name holding the control plane config YAML |
+| `GMAIL_TOPIC_NAME` | yes | — | Pub/Sub topic name for Gmail watch |
 | `PORT` | no | `8080` | HTTP listen port |
-| `GMAIL_TOPIC_NAME` | no | — | Pub/Sub topic name for Gmail watch |
-| `HISTORY_ID_DOC_PATH` | no | `gmail_history` | Firestore doc ID storing last Gmail history ID |
-| `CONFIG_COLLECTION` | no | `config` | Firestore collection for app config docs |
-| `FILTER_BILLER_SENDERS` | no | — | Comma-separated sender substrings to allow |
-| `FILTER_KEYWORDS` | no | — | Comma-separated keywords that must all appear in message |
-| `FILTER_LABEL_IDS` | no | — | Comma-separated Gmail label IDs that must all be present |
 
-Filters can also be specified in the YAML config file under a `filters:` key (overrides env vars).
+**Secret Manager**
+
+| Secret ID | Description |
+|---|---|
+| `gmail-inbox-user` | Gmail address to read bills from and send notifications as. Fetched at startup via Secret Manager API (always latest version). Update by adding a new secret version — takes effect on next cold start. |
+
+**Control plane (GCS)**
+
+The file `gs://$CONFIG_BUCKET/config.yaml` is downloaded at startup. Fail-fast if missing.
+
+```yaml
+filters:
+  billerSenders:       # sender substring allowlist
+    - "@example-electric.com"
+  keywords:            # all must appear in message body
+    - "amount due"
+  labelIDs:            # all must be present on message
+    - "Label_123456"
+```
+
+Environment-specific source files live at `configuration/{env}.yaml` in this repo. Merging to main automatically uploads the file to the corresponding GCS bucket via the `deploy-config` workflow.
+
+**Hardcoded Firestore constants** (not configurable)
+
+| Constant | Value |
+|---|---|
+| Roommates collection | `roommates` |
+| Bills collection | `bills` |
+| Config collection | `config` |
+| History ID doc path | `gmail_history` |
 
 ### Firestore data model
 

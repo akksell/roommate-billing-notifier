@@ -1,0 +1,37 @@
+name: Deploy Config
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'configuration/dev.yaml'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy-dev-config:
+    name: Upload development application configuration
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup devenv
+        uses: ./.github/actions/setup-devenv
+        with:
+          github_token: ${{ github.token }}
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Authenticate to GCP via Workload Identity Federation
+        uses: ./.github/actions/authenticate-gcp
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_INFRA_MGR_SA }}
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Upload config to GCS
+        run: devenv shell -- gcloud storage cp configuration/dev.yaml gs://rbn-service-config-configuration-dev/config.yaml

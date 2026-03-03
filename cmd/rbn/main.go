@@ -19,20 +19,19 @@ import (
 )
 
 func main() {
-	configPath := os.Getenv("CONFIG_PATH")
-	cfg, err := config.Load(configPath)
+	ctx := context.Background()
+	cfg, err := config.Load(ctx)
 	if err != nil {
 		log.Fatalf("config: %v", err)
 	}
 
-	ctx := context.Background()
 	fsClient, err := firestore.NewClient(ctx, cfg.FirestoreProjectID)
 	if err != nil {
 		log.Fatalf("firestore: %v", err)
 	}
 	defer fsClient.Close()
 
-	st := store.New(fsClient, cfg)
+	st := store.New(fsClient)
 
 	gmailClient, err := gmail.NewClient(ctx, cfg.GmailInboxUser)
 	if err != nil {
