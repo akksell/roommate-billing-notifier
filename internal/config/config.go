@@ -1,78 +1,119 @@
 package config
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"os"
-	"strconv"
-	"strings"
+
+	secretmanager "cloud.google.com/go/secretmanager/apiv1"
+	secretmanagerpb "cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
+	"cloud.google.com/go/storage"
+	"gopkg.in/yaml.v3"
 )
 
-// Config holds application configuration from env and optional file.
+// Config holds application configuration.
 // The server uses Application Default Credentials (e.g. the service account
 // attached to the Cloud Run service); no credential path is configured here.
 type Config struct {
-	// Server
-	Port string
-
-	// Gmail (inbox to read from; same identity is used to send notifications via Gmail API)
-	GmailTopicName   string
-	GmailInboxUser   string // required: inbox address, e.g. billing@example.com
-	HistoryIDDocPath string // document ID in ConfigCollection for storing last history ID
-
-	// Firestore
-	FirestoreProjectID  string
-	RoommatesCollection string
-	BillsCollection      string
-	// ConfigCollection is the Firestore collection for app config documents (e.g. the
-	// gmail_history doc that stores the last processed Gmail history ID for sync).
-	ConfigCollection string
-
-	// Filters
-	Filters FilterSpec
+	Port               string     // env: PORT
+	FirestoreProjectID string     // env: FIRESTORE_PROJECT_ID
+	GmailTopicName     string     // env: GMAIL_TOPIC_NAME
+	GmailInboxUser     string     // Secret Manager: gmail-inbox-user
+	Filters            FilterSpec // GCS: gs://$CONFIG_BUCKET/config.yaml
 }
 
 // FilterSpec defines which messages are treated as bills.
 type FilterSpec struct {
-	BillerSenders []string
-	Keywords      []string
-	LabelIDs      []string
+	BillerSenders []string `yaml:"billerSenders"`
+	Keywords      []string `yaml:"keywords"`
+	LabelIDs      []string `yaml:"labelIDs"`
 }
 
-// Load reads configuration from environment and optional config file path.
-// GmailInboxUser is required (no default) so the inbox address is not committed to the repo.
-func Load(configPath string) (*Config, error) {
-	c := &Config{
-		Port:                getEnv("PORT", "8080"),
-		GmailTopicName:      getEnv("GMAIL_TOPIC_NAME", ""),
-		GmailInboxUser:      getEnv("GMAIL_INBOX_USER", ""),
-		HistoryIDDocPath:    getEnv("HISTORY_ID_DOC_PATH", "gmail_history"),
-		FirestoreProjectID:  getEnv("FIRESTORE_PROJECT_ID", ""),
-		RoommatesCollection: getEnv("ROOMMATES_COLLECTION", "roommates"),
-		BillsCollection:     getEnv("BILLS_COLLECTION", "bills"),
-		ConfigCollection:    getEnv("CONFIG_COLLECTION", "config"),
+type controlPlaneConfig struct {
+	Filters FilterSpec `yaml:"filters"`
+}
+
+const (
+	gmailInboxUserSecret = "gmail-inbox-user"
+	gcsConfigObject      = "config.yaml"
+)
+
+// Load reads configuration from environment variables, Secret Manager, and GCS.
+// Fails fast if any required value is missing or unreachable.
+func Load(ctx context.Context) (*Config, error) {
+	projectID := getEnv("FIRESTORE_PROJECT_ID", "")
+	if projectID == "" {
+		return nil, fmt.Errorf("FIRESTORE_PROJECT_ID is required")
 	}
 
-	if c.GmailInboxUser == "" {
-		return nil, fmt.Errorf("GMAIL_INBOX_USER is required")
+	configBucket := getEnv("CONFIG_BUCKET", "")
+	if configBucket == "" {
+		return nil, fmt.Errorf("CONFIG_BUCKET is required")
 	}
 
-	if v := getEnv("FILTER_BILLER_SENDERS", ""); v != "" {
-		c.Filters.BillerSenders = splitTrim(v)
-	}
-	if v := getEnv("FILTER_KEYWORDS", ""); v != "" {
-		c.Filters.Keywords = splitTrim(v)
-	}
-	if v := getEnv("FILTER_LABEL_IDS", ""); v != "" {
-		c.Filters.LabelIDs = splitTrim(v)
+	gmailTopicName := getEnv("GMAIL_TOPIC_NAME", "")
+	if gmailTopicName == "" {
+		return nil, fmt.Errorf("GMAIL_TOPIC_NAME is required")
 	}
 
-	if configPath != "" {
-		if err := loadFile(configPath, c); err != nil && !os.IsNotExist(err) {
-			return nil, fmt.Errorf("config file %s: %w", configPath, err)
-		}
+	inboxUser, err := fetchSecret(ctx, projectID, gmailInboxUserSecret)
+	if err != nil {
+		return nil, fmt.Errorf("gmail inbox user: %w", err)
 	}
 
-	return c, nil
+	filters, err := fetchGCSConfig(ctx, configBucket)
+	if err != nil {
+		return nil, fmt.Errorf("GCS config: %w", err)
+	}
+
+	return &Config{
+		Port:               getEnv("PORT", "8080"),
+		FirestoreProjectID: projectID,
+		GmailTopicName:     gmailTopicName,
+		GmailInboxUser:     inboxUser,
+		Filters:            filters,
+	}, nil
+}
+
+func fetchSecret(ctx context.Context, projectID, secretName string) (string, error) {
+	client, err := secretmanager.NewClient(ctx)
+	if err != nil {
+		return "", fmt.Errorf("create client: %w", err)
+	}
+	defer client.Close()
+
+	name := fmt.Sprintf("projects/%s/secrets/%s/versions/latest", projectID, secretName)
+	result, err := client.AccessSecretVersion(ctx, &secretmanagerpb.AccessSecretVersionRequest{Name: name})
+	if err != nil {
+		return "", fmt.Errorf("access version: %w", err)
+	}
+	return string(result.Payload.Data), nil
+}
+
+func fetchGCSConfig(ctx context.Context, bucket string) (FilterSpec, error) {
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		return FilterSpec{}, fmt.Errorf("create client: %w", err)
+	}
+	defer client.Close()
+
+	r, err := client.Bucket(bucket).Object(gcsConfigObject).NewReader(ctx)
+	if err != nil {
+		return FilterSpec{}, fmt.Errorf("open object: %w", err)
+	}
+	defer r.Close()
+
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return FilterSpec{}, fmt.Errorf("read: %w", err)
+	}
+
+	var cp controlPlaneConfig
+	if err := yaml.Unmarshal(data, &cp); err != nil {
+		return FilterSpec{}, fmt.Errorf("parse yaml: %w", err)
+	}
+	return cp.Filters, nil
 }
 
 func getEnv(key, def string) string {
@@ -80,24 +121,4 @@ func getEnv(key, def string) string {
 		return v
 	}
 	return def
-}
-
-func getEnvInt(key string, def int) int {
-	if v := os.Getenv(key); v != "" {
-		if i, err := strconv.Atoi(v); err == nil {
-			return i
-		}
-	}
-	return def
-}
-
-func splitTrim(s string) []string {
-	parts := strings.Split(s, ",")
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
-		if t := strings.TrimSpace(p); t != "" {
-			out = append(out, t)
-		}
-	}
-	return out
 }

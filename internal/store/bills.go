@@ -9,7 +9,7 @@ import (
 
 // SaveBill creates or updates a bill and its debts subcollection (idempotent by gmailMessageId).
 func (s *Store) SaveBill(ctx context.Context, bill *Bill, debts []Debt) error {
-	billCol := s.client.Collection(s.cfg.BillsCollection)
+	billCol := s.client.Collection(billsCollection)
 
 	// Use Gmail message ID as doc ID for idempotency if set
 	docID := bill.ID
@@ -63,7 +63,7 @@ func (s *Store) SaveBill(ctx context.Context, bill *Bill, debts []Debt) error {
 
 // GetBillByGmailMessageID returns a bill doc ref if one exists with that gmailMessageId.
 func (s *Store) GetBillByGmailMessageID(ctx context.Context, gmailMessageID string) (*firestore.DocumentRef, error) {
-	iter := s.client.Collection(s.cfg.BillsCollection).
+	iter := s.client.Collection(billsCollection).
 		Where("gmailMessageId", "==", gmailMessageID).
 		Limit(1).
 		Documents(ctx)
@@ -78,7 +78,7 @@ func (s *Store) GetBillByGmailMessageID(ctx context.Context, gmailMessageID stri
 
 // MarkDebtPaid updates a debt's status to paid and recomputes the bill's status.
 func (s *Store) MarkDebtPaid(ctx context.Context, billID, roommateID string, paidAt time.Time, paidBy string) error {
-	billRef := s.client.Collection(s.cfg.BillsCollection).Doc(billID)
+	billRef := s.client.Collection(billsCollection).Doc(billID)
 	debtRef := billRef.Collection("debts").Doc(roommateID)
 
 	_, err := debtRef.Update(ctx, []firestore.Update{

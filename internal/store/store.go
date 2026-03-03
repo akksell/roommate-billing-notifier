@@ -4,24 +4,31 @@ import (
 	"context"
 
 	"cloud.google.com/go/firestore"
-	"github.com/akksell/rbn/internal/config"
 	"google.golang.org/api/iterator"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
+
+const (
+	roommatesCollection = "roommates"
+	billsCollection     = "bills"
+	historyIDDocPath    = "gmail_history"
+	configCollection    = "config"
 )
 
 // Store handles Firestore access for roommates, bills, debts, and history ID.
 type Store struct {
 	client *firestore.Client
-	cfg    *config.Config
 }
 
-// New creates a Store using the given Firestore client and config.
-func New(client *firestore.Client, cfg *config.Config) *Store {
-	return &Store{client: client, cfg: cfg}
+// New creates a Store using the given Firestore client.
+func New(client *firestore.Client) *Store {
+	return &Store{client: client}
 }
 
 // ListActiveRoommates returns roommates where active is true or not set.
 func (s *Store) ListActiveRoommates(ctx context.Context) ([]Roommate, error) {
-	col := s.client.Collection(s.cfg.RoommatesCollection)
+	col := s.client.Collection(roommatesCollection)
 	iter := col.Documents(ctx)
 	defer iter.Stop()
 
@@ -54,10 +61,10 @@ func (s *Store) ListActiveRoommates(ctx context.Context) ([]Roommate, error) {
 
 // GetHistoryID returns the stored Gmail history ID, or empty if none.
 func (s *Store) GetHistoryID(ctx context.Context) (string, error) {
-	docRef := s.client.Collection(s.cfg.ConfigCollection).Doc(s.cfg.HistoryIDDocPath)
+	docRef := s.client.Collection(configCollection).Doc(historyIDDocPath)
 	doc, err := docRef.Get(ctx)
 	if err != nil {
-		if err == firestore.ErrNotFound {
+		if status.Code(err) == codes.NotFound {
 			return "", nil
 		}
 		return "", err
@@ -72,7 +79,7 @@ func (s *Store) GetHistoryID(ctx context.Context) (string, error) {
 
 // SetHistoryID saves the Gmail history ID for the next sync.
 func (s *Store) SetHistoryID(ctx context.Context, historyID string) error {
-	docRef := s.client.Collection(s.cfg.ConfigCollection).Doc(s.cfg.HistoryIDDocPath)
+	docRef := s.client.Collection(configCollection).Doc(historyIDDocPath)
 	_, err := docRef.Set(ctx, map[string]interface{}{"historyId": historyID})
 	return err
 }
