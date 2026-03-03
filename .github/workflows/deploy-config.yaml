@@ -34,4 +34,4 @@ jobs:
           project_id: ${{ vars.GCP_PROJECT_ID }}
 
       - name: Upload config to GCS
-        run: devenv shell -- gcloud storage cp configuration/dev.yaml gs://rbn-service-config-configuration-dev/config.yaml
+        run: devenv shell -- gcloud storage cp configuration/dev.yaml gs://rbn-service-config-dev/config.yaml
